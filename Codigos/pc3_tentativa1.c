@@ -1,9 +1,20 @@
 #include <msp430.h>
 
+volatile int ADC_Result,ADC_Ref,duty_cycle;
+
 void ConfigPinos(){                              //Configuração dos pinos I/O
     P1DIR |= BIT0 + BIT1;
     P1OUT &= ~BIT0;
     P1SEL1 |= BIT1;
+
+
+    P2DIR &= ~BIT3;
+    P2REN |= BIT3;
+    P2OUT |= BIT3;
+    P2IE = BIT3;
+    P2IES = BIT3;
+    P2IFG = 0x00;
+    _enable_interrupts();
 }
 
 void ConfigTimerA(){                            //Configuração do Timer A
@@ -31,28 +42,37 @@ int main(void)
     ConfigPinos();
     ConfigTimerA();
     ConfigADC10();
+//------Achando valor de referencia----------
 
-    unsigned volatile int ADC_Result;
+    ADCCTL0 |= ADCSC;
+    ADC_Ref= ADCMEM0;
 
     while(1){
         ADCCTL0 |= ADCSC;                           // Sampling and conversion start
-           while(ADCCTL1 & ADCBUSY);
+        while(ADCCTL1 & ADCBUSY);
         ADC_Result= ADCMEM0;
 
-        if(ADC_Result>700){
+        if((ADC_Ref-ADC_Result)>=100){
             if(TA0CCR1<=10){
                 TA0CCR1=0;
             }else{
                 TA0CCR1--;
             }
         }
-        if(ADC_Result<600){
+        if((ADC_Ref-ADC_Result)<=50){
             if(TA0CCR1>=990){
                 TA0CCR1=990;
             }else{
                 TA0CCR1++;
             }
         }
-        }
+    duty_cycle=TA0CCR1;
+    }
 
+}
+#pragma vector=PORT2_VECTOR
+__interrupt void PORT2_ISR(void){
+    ADCCTL0 |= ADCSC;
+    ADC_Ref= ADCMEM0;
+    P2IFG = 0x00;
 }
