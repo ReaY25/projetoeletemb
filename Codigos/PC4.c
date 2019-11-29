@@ -2,20 +2,27 @@
 
 extern int media_ADC(int A[]);
 
-int ADC_Result[4],ADC_Ref[4],duty_cycle;
-int media_result, media_ref;
+int ADC_Ref[4]={0,0,0,0},media_ref=0;
+
+int media_ADC_C(int A[]){
+        int i;
+        int media=0;
+        for(i=0;i<=3;i++){
+            media+=A[i];
+        }
+        return media/4;
+}
 
 void ConfigPinos(){                              //Configuração dos pinos I/O
-    P1DIR |= BIT0 + BIT1 + BIT2 + BIT3;
-    P1OUT &= ~BIT0;
+    P1DIR |= BIT1 + BIT2 + BIT3;
     P1SEL1 |= BIT1;
 
 
-    P2DIR &= ~BIT3;
-    P2REN |= BIT3;
-    P2OUT |= BIT3;
-    P2IE = BIT3;
-    P2IES = BIT3;
+    P2DIR &= ~BIT7;
+    P2REN |= BIT7;
+    P2OUT |= BIT7;
+    P2IE = BIT7;
+    P2IES = BIT7;
     P2IFG = 0x00;
     _enable_interrupts();
 }
@@ -65,6 +72,10 @@ void Ler_sensor(int ADC[]){
 
 int main(void)
 {
+    int ADC_Result[4];
+    int volatile duty_cycle;
+    int media_result;
+
     WDTCTL = WDTPW | WDTHOLD;                  // Desliga Watch Dog-Time
     PM5CTL0 &= ~LOCKLPM5;                      // Desliga modo de alta impedancia dos pinos
 
@@ -82,13 +93,13 @@ int main(void)
         Ler_sensor(ADC_Result);
         media_result= media_ADC(ADC_Result);
 
-        if((media_ref-media_result)>=150 ){
+        if((media_ref-media_result)>150 ){
             if(TA0CCR1<=10){
                 TA0CCR1=0;
             }else{
                 TA0CCR1-=3;
             }
-        } else if((media_ref-media_result)<=(50)){
+        } else if((media_ref-media_result)<=100){
             if(TA0CCR1>=990){
                 TA0CCR1=990;
             }else{
@@ -104,7 +115,7 @@ int main(void)
 __interrupt void PORT2_ISR(void){
 
     Ler_sensor(ADC_Ref);
-    media_ref= media_ADC(ADC_Ref);
+    media_ref= media_ADC_C(ADC_Ref);
 
     P2IFG = 0x00;
 }
